@@ -1,25 +1,69 @@
 import { MilitaryFormData } from '../components/MilitaryReportForm';
 
+export type MilitaryStatus = 
+  | 'active'              // На службі / В строю
+  | 'business_trip'       // Відрядження
+  | 'vacation_main'       // Відпустка Основна
+  | 'vacation_treatment'  // Відпустка Лікування
+  | 'awol'                // СЗЧ
+  | 'deceased';           // Загинув
+
 export interface MilitaryProfile {
   id: string;
   pib: string;
+  short_pib?: string;
+  status?: MilitaryStatus; // Статус бійця
   rank: string;
   position: string;
+  full_position?: string;
+  position_index?: string;
+  vos?: string;
   division: string;
+  service_type?: string;
   phone: string;
   bday?: string;
+  birth_place?: string;
+  full_years?: string;
   citizen?: string;
   tck?: string;
   draft?: string;
+  arrived_from?: string;
+  
   tariff_range?: string;
   staff_category?: string;
   salary_position?: string;
   salary_rank?: string;
   features_pct?: string;
   premium_pct?: string;
+  
   exp_years?: number;
   exp_months?: number;
+  exp_days?: number;
+  
+  acceptance_date?: string;
+  arrival_date?: string;
+  rank_order?: string;
+  rank_order_date?: string;
+  appointment_order?: string;
+  appointment_order_num?: string;
+  appointment_order_date?: string;
+  military_id_card?: string;
+  contract_end_date?: string;
+  
+  ubd_status?: string;
+  ubd_period?: string;
+  ipn?: string;
+  fitness_vlk?: string;
+  vlk_certificate?: string;
+  vlk_date?: string;
+  marital_status?: string;
+  contact_person?: string;
+  education?: string;
+  education_degree?: string;
+  gender?: string;
+  registration_address?: string;
   vacation_address?: string;
+  
   updated_at: string;
 }
 
@@ -43,8 +87,9 @@ async function saveProfilesList(profiles: MilitaryProfile[]): Promise<void> {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
 }
 
-// Пряме збереження або редагування з форми модального вікна
-export async function saveOrUpdateExplicitProfile(profile: Partial<MilitaryProfile> & { pib: string }): Promise<MilitaryProfile> {
+export async function saveOrUpdateExplicitProfile(
+  profile: Partial<MilitaryProfile> & { pib: string }
+): Promise<MilitaryProfile> {
   const currentProfiles = await getAllProfiles();
   const now = new Date().toISOString();
 
@@ -62,27 +107,15 @@ export async function saveOrUpdateExplicitProfile(profile: Partial<MilitaryProfi
     }
   }
 
-  // Якщо створення нового або ID не знайдено
   const newProfile: MilitaryProfile = {
-    id: `prof_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+    rank: '',
+    position: '',
+    division: '',
+    phone: '',
+    status: 'active',
+    ...profile,
+    id: profile.id || `prof_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
     pib: profile.pib.trim(),
-    rank: profile.rank || '',
-    position: profile.position || '',
-    division: profile.division || '',
-    phone: profile.phone || '',
-    bday: profile.bday || '',
-    citizen: profile.citizen || '',
-    tck: profile.tck || '',
-    draft: profile.draft || '',
-    tariff_range: profile.tariff_range || '',
-    staff_category: profile.staff_category || '',
-    salary_position: profile.salary_position || '',
-    salary_rank: profile.salary_rank || '',
-    features_pct: profile.features_pct || '',
-    premium_pct: profile.premium_pct || '',
-    exp_years: profile.exp_years || 0,
-    exp_months: profile.exp_months || 0,
-    vacation_address: profile.vacation_address || '',
     updated_at: now
   };
 
@@ -91,7 +124,6 @@ export async function saveOrUpdateExplicitProfile(profile: Partial<MilitaryProfi
   return newProfile;
 }
 
-// Автооновлення при генерації рапорту
 export async function autoSaveOrUpdateProfile(formData: MilitaryFormData): Promise<MilitaryProfile | null> {
   if (!formData.pib || !formData.pib.trim()) return null;
 
@@ -120,6 +152,7 @@ export async function autoSaveOrUpdateProfile(formData: MilitaryFormData): Promi
       premium_pct: formData.premium_pct || existing.premium_pct,
       exp_years: formData.exp_years !== undefined && formData.exp_years > 0 ? formData.exp_years : existing.exp_years,
       exp_months: formData.exp_months !== undefined && formData.exp_months > 0 ? formData.exp_months : existing.exp_months,
+      acceptance_date: formData.acceptance_date || existing.acceptance_date,
       vacation_address: formData.vacation_address || existing.vacation_address,
       updated_at: new Date().toISOString()
     };
@@ -146,7 +179,9 @@ export async function autoSaveOrUpdateProfile(formData: MilitaryFormData): Promi
       premium_pct: formData.premium_pct,
       exp_years: formData.exp_years,
       exp_months: formData.exp_months,
-      vacation_address: formData.vacation_address
+      acceptance_date: formData.acceptance_date,
+      vacation_address: formData.vacation_address,
+      status: 'active'
     });
   }
 }
@@ -155,4 +190,31 @@ export async function deleteProfile(id: string): Promise<void> {
   const currentProfiles = await getAllProfiles();
   const filtered = currentProfiles.filter(p => p.id !== id);
   await saveProfilesList(filtered);
+}
+
+// Масове видалення списку профілів
+export async function deleteProfilesBulk(ids: string[]): Promise<void> {
+  const set = new Set(ids);
+  const currentProfiles = await getAllProfiles();
+  const filtered = currentProfiles.filter(p => !set.has(p.id));
+  await saveProfilesList(filtered);
+}
+
+// Оновлення статусу одного або кількох профілів
+export async function updateProfilesStatus(ids: string[], status: MilitaryStatus): Promise<void> {
+  const set = new Set(ids);
+  const currentProfiles = await getAllProfiles();
+  const now = new Date().toISOString();
+  
+  const updated = currentProfiles.map(p => {
+    if (set.has(p.id)) {
+      return { ...p, status, updated_at: now };
+    }
+    return p;
+  });
+  
+  await saveProfilesList(updated);
+}
+export async function replaceAllProfiles(profiles: MilitaryProfile[]): Promise<void> {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
 }
