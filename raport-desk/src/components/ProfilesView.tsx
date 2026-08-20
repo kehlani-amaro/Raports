@@ -1,15 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { 
-  Users, Search, Plus, Edit3, Trash2, ArrowRight, 
-  Phone, Shield, Award, Calendar, X, Check, 
-  FileSpreadsheet, Loader2, FileCheck, UserCheck, 
+import {
+  Users, Search, Plus, Edit3, Trash2, ArrowRight,
+  Phone, Shield, Award, Calendar, X, Check,
+  FileSpreadsheet, Loader2, FileCheck, UserCheck,
   Plane, Palmtree, HeartPulse, AlertTriangle, Skull, CheckCircle2,
   CheckSquare, Square
 } from 'lucide-react';
-import { 
-  getAllProfiles, deleteProfile, deleteProfilesBulk, 
-  updateProfilesStatus, saveOrUpdateExplicitProfile, 
-  MilitaryProfile, MilitaryStatus 
+import {
+  getAllProfiles, deleteProfile, deleteProfilesBulk,
+  updateProfilesStatus, saveOrUpdateExplicitProfile,
+  MilitaryProfile, MilitaryStatus
 } from '../services/profilesService';
 import { importProfilesFromEzhoos } from '../services/ezhoosParser';
 import { MilitaryFormData } from './MilitaryReportForm';
@@ -55,6 +55,13 @@ const STATUS_CONFIG: Record<MilitaryStatus, { label: string; color: string; bg: 
     bg: 'bg-rose-950/40',
     border: 'border-rose-800/60',
     icon: AlertTriangle
+  },
+  hospital: {
+    label: 'Лікарня',
+    color: 'text-cyan-400',
+    bg: 'bg-cyan-950/40',
+    border: 'border-cyan-800/60',
+    icon: FileCheck
   },
   deceased: {
     label: 'Загинув',
@@ -234,7 +241,7 @@ export const ProfilesView: React.FC<Props> = ({ onSelectProfile }) => {
 
   const toggleSelectOne = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setSelectedIds(prev => 
+    setSelectedIds(prev =>
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
   };
@@ -265,6 +272,7 @@ export const ProfilesView: React.FC<Props> = ({ onSelectProfile }) => {
     vacation_main: profiles.filter(p => p.status === 'vacation_main').length,
     vacation_treatment: profiles.filter(p => p.status === 'vacation_treatment').length,
     awol: profiles.filter(p => p.status === 'awol').length,
+    hospital: profiles.filter(p => p.status === 'hospital').length,
     deceased: profiles.filter(p => p.status === 'deceased').length,
   };
 
@@ -313,7 +321,7 @@ export const ProfilesView: React.FC<Props> = ({ onSelectProfile }) => {
             Особового складу в базі: <span className="text-blue-400 font-semibold">{profiles.length}</span>
           </p>
         </div>
-        
+
         <div className="flex items-center gap-2.5">
           <div className="relative w-64">
             <input
@@ -354,22 +362,20 @@ export const ProfilesView: React.FC<Props> = ({ onSelectProfile }) => {
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 shrink-0 select-none custom-scrollbar">
         <button
           onClick={() => setStatusFilter('all')}
-          className={`px-3 py-1 rounded-lg text-xs font-medium border transition ${
-            statusFilter === 'all'
-              ? 'bg-blue-600 border-blue-500 text-white shadow-sm'
-              : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-slate-200'
-          }`}
+          className={`px-3 py-1 rounded-lg text-xs font-medium border transition ${statusFilter === 'all'
+            ? 'bg-blue-600 border-blue-500 text-white shadow-sm'
+            : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
         >
           Всі ({counts.all})
         </button>
 
         <button
           onClick={() => setStatusFilter('active')}
-          className={`px-3 py-1 rounded-lg text-xs font-medium border transition flex items-center gap-1.5 ${
-            statusFilter === 'active'
-              ? 'bg-emerald-950 border-emerald-600 text-emerald-300 shadow-sm'
-              : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-emerald-300'
-          }`}
+          className={`px-3 py-1 rounded-lg text-xs font-medium border transition flex items-center gap-1.5 ${statusFilter === 'active'
+            ? 'bg-emerald-950 border-emerald-600 text-emerald-300 shadow-sm'
+            : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-emerald-300'
+            }`}
         >
           <CheckCircle2 className="w-3 h-3 text-emerald-400" />
           В строю ({counts.active})
@@ -377,11 +383,10 @@ export const ProfilesView: React.FC<Props> = ({ onSelectProfile }) => {
 
         <button
           onClick={() => setStatusFilter('business_trip')}
-          className={`px-3 py-1 rounded-lg text-xs font-medium border transition flex items-center gap-1.5 ${
-            statusFilter === 'business_trip'
-              ? 'bg-blue-950 border-blue-600 text-blue-300 shadow-sm'
-              : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-blue-300'
-          }`}
+          className={`px-3 py-1 rounded-lg text-xs font-medium border transition flex items-center gap-1.5 ${statusFilter === 'business_trip'
+            ? 'bg-blue-950 border-blue-600 text-blue-300 shadow-sm'
+            : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-blue-300'
+            }`}
         >
           <Plane className="w-3 h-3 text-blue-400" />
           Відрядження ({counts.business_trip})
@@ -389,11 +394,10 @@ export const ProfilesView: React.FC<Props> = ({ onSelectProfile }) => {
 
         <button
           onClick={() => setStatusFilter('vacation_main')}
-          className={`px-3 py-1 rounded-lg text-xs font-medium border transition flex items-center gap-1.5 ${
-            statusFilter === 'vacation_main'
-              ? 'bg-amber-950 border-amber-600 text-amber-300 shadow-sm'
-              : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-amber-300'
-          }`}
+          className={`px-3 py-1 rounded-lg text-xs font-medium border transition flex items-center gap-1.5 ${statusFilter === 'vacation_main'
+            ? 'bg-amber-950 border-amber-600 text-amber-300 shadow-sm'
+            : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-amber-300'
+            }`}
         >
           <Palmtree className="w-3 h-3 text-amber-400" />
           Відпустка Осн. ({counts.vacation_main})
@@ -401,11 +405,10 @@ export const ProfilesView: React.FC<Props> = ({ onSelectProfile }) => {
 
         <button
           onClick={() => setStatusFilter('vacation_treatment')}
-          className={`px-3 py-1 rounded-lg text-xs font-medium border transition flex items-center gap-1.5 ${
-            statusFilter === 'vacation_treatment'
-              ? 'bg-teal-950 border-teal-600 text-teal-300 shadow-sm'
-              : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-teal-300'
-          }`}
+          className={`px-3 py-1 rounded-lg text-xs font-medium border transition flex items-center gap-1.5 ${statusFilter === 'vacation_treatment'
+            ? 'bg-teal-950 border-teal-600 text-teal-300 shadow-sm'
+            : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-teal-300'
+            }`}
         >
           <HeartPulse className="w-3 h-3 text-teal-400" />
           Відпустка Лік. ({counts.vacation_treatment})
@@ -413,23 +416,32 @@ export const ProfilesView: React.FC<Props> = ({ onSelectProfile }) => {
 
         <button
           onClick={() => setStatusFilter('awol')}
-          className={`px-3 py-1 rounded-lg text-xs font-medium border transition flex items-center gap-1.5 ${
-            statusFilter === 'awol'
-              ? 'bg-rose-950 border-rose-600 text-rose-300 shadow-sm'
-              : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-rose-300'
-          }`}
+          className={`px-3 py-1 rounded-lg text-xs font-medium border transition flex items-center gap-1.5 ${statusFilter === 'awol'
+            ? 'bg-rose-950 border-rose-600 text-rose-300 shadow-sm'
+            : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-rose-300'
+            }`}
         >
           <AlertTriangle className="w-3 h-3 text-rose-400" />
           СЗЧ ({counts.awol})
         </button>
 
         <button
+          onClick={() => setStatusFilter('hospital')}
+          className={`px-3 py-1 rounded-lg text-xs font-medium border transition flex items-center gap-1.5 ${statusFilter === 'hospital'
+            ? 'bg-cyan-950 border-cyan-600 text-cyan-300 shadow-sm'
+            : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-cyan-300'
+            }`}
+        >
+          <FileCheck className="w-3 h-3 text-cyan-400" />
+          Лікарня ({counts.hospital})
+        </button>
+
+        <button
           onClick={() => setStatusFilter('deceased')}
-          className={`px-3 py-1 rounded-lg text-xs font-medium border transition flex items-center gap-1.5 ${
-            statusFilter === 'deceased'
-              ? 'bg-slate-800 border-slate-600 text-slate-200 shadow-sm'
-              : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-slate-200'
-          }`}
+          className={`px-3 py-1 rounded-lg text-xs font-medium border transition flex items-center gap-1.5 ${statusFilter === 'deceased'
+            ? 'bg-slate-800 border-slate-600 text-slate-200 shadow-sm'
+            : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
         >
           <Skull className="w-3 h-3 text-slate-400" />
           Загинув ({counts.deceased})
@@ -488,11 +500,10 @@ export const ProfilesView: React.FC<Props> = ({ onSelectProfile }) => {
                 <div
                   key={p.id}
                   onClick={() => setSelectedId(p.id)}
-                  className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                    isSelected 
-                      ? 'bg-blue-950/30 border-blue-600/60 shadow-lg shadow-blue-950/40' 
-                      : 'bg-slate-900/60 border-slate-800 hover:bg-slate-800/50'
-                  }`}
+                  className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${isSelected
+                    ? 'bg-blue-950/30 border-blue-600/60 shadow-lg shadow-blue-950/40'
+                    : 'bg-slate-900/60 border-slate-800 hover:bg-slate-800/50'
+                    }`}
                 >
                   <div className="flex items-start gap-3 min-w-0 pr-2">
                     {/* Чекбокс */}
@@ -597,11 +608,10 @@ export const ProfilesView: React.FC<Props> = ({ onSelectProfile }) => {
                 <div className="flex flex-wrap gap-1.5">
                   <button
                     onClick={() => handleSetStatus(activeProfile.id, 'active')}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium border flex items-center gap-1 transition ${
-                      (activeProfile.status || 'active') === 'active'
-                        ? 'bg-emerald-950 border-emerald-600 text-emerald-300 shadow-sm'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
-                    }`}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium border flex items-center gap-1 transition ${(activeProfile.status || 'active') === 'active'
+                      ? 'bg-emerald-950 border-emerald-600 text-emerald-300 shadow-sm'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                      }`}
                   >
                     <CheckCircle2 className="w-3 h-3 text-emerald-400" />
                     В строю
@@ -609,11 +619,10 @@ export const ProfilesView: React.FC<Props> = ({ onSelectProfile }) => {
 
                   <button
                     onClick={() => handleSetStatus(activeProfile.id, 'business_trip')}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium border flex items-center gap-1 transition ${
-                      activeProfile.status === 'business_trip'
-                        ? 'bg-blue-950 border-blue-600 text-blue-300 shadow-sm'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
-                    }`}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium border flex items-center gap-1 transition ${activeProfile.status === 'business_trip'
+                      ? 'bg-blue-950 border-blue-600 text-blue-300 shadow-sm'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                      }`}
                   >
                     <Plane className="w-3 h-3 text-blue-400" />
                     Відрядження
@@ -621,11 +630,10 @@ export const ProfilesView: React.FC<Props> = ({ onSelectProfile }) => {
 
                   <button
                     onClick={() => handleSetStatus(activeProfile.id, 'vacation_main')}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium border flex items-center gap-1 transition ${
-                      activeProfile.status === 'vacation_main'
-                        ? 'bg-amber-950 border-amber-600 text-amber-300 shadow-sm'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
-                    }`}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium border flex items-center gap-1 transition ${activeProfile.status === 'vacation_main'
+                      ? 'bg-amber-950 border-amber-600 text-amber-300 shadow-sm'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                      }`}
                   >
                     <Palmtree className="w-3 h-3 text-amber-400" />
                     Відпустка Основна
@@ -633,11 +641,10 @@ export const ProfilesView: React.FC<Props> = ({ onSelectProfile }) => {
 
                   <button
                     onClick={() => handleSetStatus(activeProfile.id, 'vacation_treatment')}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium border flex items-center gap-1 transition ${
-                      activeProfile.status === 'vacation_treatment'
-                        ? 'bg-teal-950 border-teal-600 text-teal-300 shadow-sm'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
-                    }`}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium border flex items-center gap-1 transition ${activeProfile.status === 'vacation_treatment'
+                      ? 'bg-teal-950 border-teal-600 text-teal-300 shadow-sm'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                      }`}
                   >
                     <HeartPulse className="w-3 h-3 text-teal-400" />
                     Відпустка Лікування
@@ -645,23 +652,30 @@ export const ProfilesView: React.FC<Props> = ({ onSelectProfile }) => {
 
                   <button
                     onClick={() => handleSetStatus(activeProfile.id, 'awol')}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium border flex items-center gap-1 transition ${
-                      activeProfile.status === 'awol'
-                        ? 'bg-rose-950 border-rose-600 text-rose-300 shadow-sm'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
-                    }`}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium border flex items-center gap-1 transition ${activeProfile.status === 'awol'
+                      ? 'bg-rose-950 border-rose-600 text-rose-300 shadow-sm'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                      }`}
                   >
                     <AlertTriangle className="w-3 h-3 text-rose-400" />
                     СЗЧ
                   </button>
-
+                  <button
+                    onClick={() => handleSetStatus(activeProfile.id, 'hospital')}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium border flex items-center gap-1 transition ${activeProfile.status === 'hospital'
+                      ? 'bg-cyan-950 border-cyan-600 text-cyan-300 shadow-sm'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                      }`}
+                  >
+                    <FileCheck className="w-3 h-3 text-cyan-400" />
+                    Лікарня
+                  </button>
                   <button
                     onClick={() => handleSetStatus(activeProfile.id, 'deceased')}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium border flex items-center gap-1 transition ${
-                      activeProfile.status === 'deceased'
-                        ? 'bg-slate-800 border-slate-600 text-slate-200 shadow-sm'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
-                    }`}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium border flex items-center gap-1 transition ${activeProfile.status === 'deceased'
+                      ? 'bg-slate-800 border-slate-600 text-slate-200 shadow-sm'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                      }`}
                   >
                     <Skull className="w-3 h-3 text-slate-400" />
                     Загинув
@@ -795,6 +809,7 @@ export const ProfilesView: React.FC<Props> = ({ onSelectProfile }) => {
                   <option value="vacation_main">Відпустка Основна</option>
                   <option value="vacation_treatment">Відпустка Лікування</option>
                   <option value="awol">СЗЧ</option>
+                  <option value="hospital">Лікарня</option>
                   <option value="deceased">Загинув</option>
                 </select>
               </div>

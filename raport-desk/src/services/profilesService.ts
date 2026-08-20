@@ -6,6 +6,7 @@ export type MilitaryStatus =
   | 'vacation_main'       // Відпустка Основна
   | 'vacation_treatment'  // Відпустка Лікування
   | 'awol'                // СЗЧ
+  | 'hospital'                // Лікарня
   | 'deceased';           // Загинув
 
 export interface MilitaryProfile {
