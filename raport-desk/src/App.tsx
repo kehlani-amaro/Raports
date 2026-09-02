@@ -5,14 +5,22 @@ import { DocxViewer } from './components/DocxViewer';
 import { TemplateManagerView } from './components/TemplateManagerView';
 import { AnalyticsView } from './components/AnalyticsView';
 import { ProfilesView } from './components/ProfilesView';
+import { Combobox } from './components/Combobox';
+import { 
+  RANKS, 
+  DIV_TYPES, 
+  REPORT_TYPES, 
+  POSITIONS_MAP, 
+  HOSPITALS 
+} from './services/militaryDict';
 import { buildMilitaryReportDocx } from './services/nativeDocxBuilder';
-import { fillDocxTemplate } from './services/docEngine';
+import { fillDocxTemplate, parseDocxPlaceholders, ExtractedField } from './services/docEngine';
 import { getSavedTemplates, SavedTemplate, base64ToArrayBuffer } from './services/templateManager';
 import { logReportGeneration } from './services/analyticsService';
 import { autoSaveOrUpdateProfile } from './services/profilesService';
 import {
   FileText, BarChart3, Library, Users, Download,
-  Sparkles, ShieldCheck, Database, WifiOff
+  Sparkles, ShieldCheck, UserCheck, Plus
 } from 'lucide-react';
 
 type TabType = 'generator' | 'analytics' | 'templates' | 'profiles';
@@ -98,16 +106,97 @@ export default function App() {
   const [generatorMode, setGeneratorMode] = useState<'builtin' | 'custom'>('builtin');
   const [builtInFormData, setBuiltInFormData] = useState<MilitaryFormData>(emptyFormData);
 
+  // Користувацькі шаблони
   const [customTemplates, setCustomTemplates] = useState<SavedTemplate[]>([]);
   const [selectedCustomId, setSelectedCustomId] = useState<string>('');
   const [customDocBuffer, setCustomDocBuffer] = useState<ArrayBuffer | null>(null);
+  const [customFields, setCustomFields] = useState<ExtractedField[]>([]);
   const [customValues, setCustomValues] = useState<Record<string, string>>({});
 
   const [previewBuffer, setPreviewBuffer] = useState<ArrayBuffer | null>(null);
 
-  // Оновлення перегляду
+  // Завантаження збережених шаблонів
+  const reloadCustomTemplates = async () => {
+    try {
+      const list = await getSavedTemplates();
+      setCustomTemplates(list);
+    } catch (err) {
+      console.error('Помилка завантаження шаблонів:', err);
+    }
+  };
+
+  useEffect(() => {
+    reloadCustomTemplates();
+
+    const onUpdate = () => reloadCustomTemplates();
+    window.addEventListener('templates_updated', onUpdate);
+    return () => window.removeEventListener('templates_updated', onUpdate);
+  }, [activeTab]);
+
+  // Вибір конкретного власного шаблону
+  const handleSelectTemplate = (template: SavedTemplate) => {
+    setSelectedCustomId(template.id);
+    setGeneratorMode('custom');
+
+    const rawBase64 = template.raw_docx_base64 || template.raw_docx_blob || '';
+    const buffer = base64ToArrayBuffer(rawBase64);
+
+    if (buffer) {
+      setCustomDocBuffer(buffer);
+      try {
+        const fields = parseDocxPlaceholders(buffer);
+        setCustomFields(fields);
+
+        const initialVals: Record<string, string> = {};
+        fields.forEach(f => {
+          initialVals[f.key] = customValues[f.key] || '';
+        });
+        setCustomValues(initialVals);
+      } catch (err) {
+        console.error('Помилка парсингу полів шаблону:', err);
+        setCustomFields([]);
+      }
+    } else {
+      setCustomDocBuffer(null);
+      setCustomFields([]);
+    }
+  };
+
+  // Автозаповнення полів власного шаблону з поточного профілю військового
+  const handleAutoFillCustom = () => {
+    if (!customFields.length) return;
+    const updated = { ...customValues };
+
+    customFields.forEach(f => {
+      const k = f.key.toLowerCase();
+      if (k.includes('піб') || k.includes('прізвище') || k === 'name' || k === 'pib') {
+        updated[f.key] = builtInFormData.pib;
+      } else if (k.includes('звання') || k === 'rank' || k === 'ранг') {
+        updated[f.key] = builtInFormData.rank;
+      } else if (k.includes('посада') || k === 'position') {
+        updated[f.key] = builtInFormData.position;
+      } else if (k.includes('підрозділ') || k.includes('дивізіон') || k === 'division') {
+        updated[f.key] = builtInFormData.division;
+      } else if (k.includes('телефон') || k === 'phone') {
+        updated[f.key] = builtInFormData.phone;
+      } else if (k.includes('народження') || k === 'bday') {
+        updated[f.key] = builtInFormData.bday;
+      } else if (k.includes('тцк') || k === 'tck') {
+        updated[f.key] = builtInFormData.tck;
+      } else if (k.includes('адреса') || k.includes('прописка')) {
+        updated[f.key] = builtInFormData.vacation_address;
+      } else if (k.includes('госпіталь') || k.includes('лікарня') || k === 'hospital') {
+        updated[f.key] = builtInFormData.hospital;
+      }
+    });
+
+    setCustomValues(updated);
+  };
+
+  // Оновлення живого попереднього перегляду DOCX
   useEffect(() => {
     let isMounted = true;
+
     if (generatorMode === 'builtin') {
       try {
         const doc = buildMilitaryReportDocx(builtInFormData);
@@ -118,15 +207,22 @@ export default function App() {
       } catch (e) {
         console.error(e);
       }
+    } else if (generatorMode === 'custom' && customDocBuffer) {
+      try {
+        const filledUint8 = fillDocxTemplate(customDocBuffer, customValues);
+        const cleanBuf = filledUint8.buffer.slice(0);
+        if (isMounted) setPreviewBuffer(cleanBuf);
+      } catch (err) {
+        console.error('Помилка генерації прев’ю власного шаблону:', err);
+      }
     }
-    return () => { isMounted = false; };
-  }, [builtInFormData, generatorMode]);
 
+    return () => { isMounted = false; };
+  }, [builtInFormData, generatorMode, customDocBuffer, customValues]);
 
   // Експорт DOCX
   const handleExport = async () => {
     try {
-      // 1. Якщо це регламентний рапорт — автоматично зберігаємо/оновлюємо профіль бійця
       if (generatorMode === 'builtin' && builtInFormData.pib.trim()) {
         try {
           await autoSaveOrUpdateProfile(builtInFormData);
@@ -135,7 +231,6 @@ export default function App() {
         }
       }
 
-      // 2. Формування DOCX та збереження файлу...
       let uint8: Uint8Array;
       let defaultName = '';
       let targetName = '';
@@ -154,12 +249,16 @@ export default function App() {
         templateTitle = builtInFormData.report_type;
         category = 'Стандартні ЗСУ';
       } else {
-        if (!customDocBuffer) return;
-        uint8 = fillDocxTemplate(customDocBuffer, customValues);
+        if (!customDocBuffer) {
+          alert('Будь ласка, оберіть шаблон');
+          return;
+        }
+        const filled = fillDocxTemplate(customDocBuffer, customValues);
+        uint8 = new Uint8Array(filled);
         const curTmpl = customTemplates.find(t => t.id === selectedCustomId);
         templateTitle = curTmpl?.title || 'Шаблон';
         defaultName = `Рапорт_${templateTitle}.docx`;
-        targetName = customValues['прізвище'] || customValues['pib'] || 'Користувач';
+        targetName = customValues['прізвище'] || customValues['pib'] || customValues['ПІБ'] || 'Користувач';
         category = curTmpl?.category || 'Користувацькі';
       }
 
@@ -190,8 +289,8 @@ export default function App() {
           template_title: templateTitle,
           category,
           target_person_name: targetName,
-          target_person_rank: generatorMode === 'builtin' ? builtInFormData.rank : '',
-          target_person_unit: generatorMode === 'builtin' ? builtInFormData.division : '',
+          target_person_rank: generatorMode === 'builtin' ? builtInFormData.rank : (customValues['звання'] || ''),
+          target_person_unit: generatorMode === 'builtin' ? builtInFormData.division : (customValues['підрозділ'] || ''),
           commander_title: generatorMode === 'builtin' ? builtInFormData.bat_name : '',
           status: 'APPROVED',
           form_payload_json: JSON.stringify(generatorMode === 'builtin' ? builtInFormData : customValues),
@@ -206,7 +305,7 @@ export default function App() {
   };
 
   function downloadBlobFallback(bytes: Uint8Array, fileName: string) {
-    const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    const blob = new Blob([bytes as BlobPart], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -217,12 +316,33 @@ export default function App() {
     URL.revokeObjectURL(url);
   }
 
+  // Функція підбору варіантів дропдауну для поля власного шаблону
+  const getDropdownOptionsForField = (key: string): string[] | null => {
+    const k = key.toLowerCase().trim();
+
+    if (k.includes('звання') || k === 'rank' || k === 'ранг') {
+      return RANKS;
+    }
+    if (k.includes('підрозділ') || k.includes('дивізіон') || k === 'division') {
+      return DIV_TYPES;
+    }
+    if (k.includes('посада') || k === 'position') {
+      return Object.keys(POSITIONS_MAP);
+    }
+    if (k.includes('госпіталь') || k.includes('лікарня') || k === 'hospital') {
+      return HOSPITALS;
+    }
+    if (k.includes('тип') && k.includes('рапорт')) {
+      return REPORT_TYPES;
+    }
+    return null;
+  };
+
   return (
     <div className="flex h-screen w-screen bg-[#050811] text-slate-100 font-sans select-none overflow-hidden">
-      {/* Бокова панель */}
+      {/* Бокова панель навігації */}
       <aside className="w-64 border-r border-slate-900 bg-[#070c18] flex flex-col justify-between p-4 shrink-0">
         <div className="space-y-6">
-          {/* Бренд */}
           <div className="flex items-center gap-3 px-2">
             <div className="p-2 rounded-xl bg-blue-600/20 text-blue-500 border border-blue-500/30">
               <ShieldCheck className="w-5 h-5" />
@@ -233,12 +353,12 @@ export default function App() {
             </div>
           </div>
 
-          {/* Меню навігації */}
           <nav className="space-y-1">
             <button
               onClick={() => setActiveTab('generator')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition ${activeTab === 'generator' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
-                }`}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition ${
+                activeTab === 'generator' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+              }`}
             >
               <FileText className="w-4 h-4" />
               Генератор рапортів
@@ -246,8 +366,9 @@ export default function App() {
 
             <button
               onClick={() => setActiveTab('analytics')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition ${activeTab === 'analytics' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
-                }`}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition ${
+                activeTab === 'analytics' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+              }`}
             >
               <BarChart3 className="w-4 h-4" />
               Журнал та Статистика
@@ -255,8 +376,9 @@ export default function App() {
 
             <button
               onClick={() => setActiveTab('templates')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition ${activeTab === 'templates' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
-                }`}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition ${
+                activeTab === 'templates' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+              }`}
             >
               <Library className="w-4 h-4" />
               База шаблонів
@@ -264,8 +386,9 @@ export default function App() {
 
             <button
               onClick={() => setActiveTab('profiles')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition ${activeTab === 'profiles' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
-                }`}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition ${
+                activeTab === 'profiles' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+              }`}
             >
               <Users className="w-4 h-4" />
               Профілі військових
@@ -273,7 +396,6 @@ export default function App() {
           </nav>
         </div>
 
-        {/* Футер */}
         <div className="space-y-2 text-[11px] text-slate-500 border-t border-slate-900 pt-4 px-2">
           <div className="flex justify-between items-center">
             <span>Сховище:</span>
@@ -288,21 +410,29 @@ export default function App() {
 
       {/* Основна робоча зона */}
       <main className="flex-1 flex flex-col min-w-0 bg-[#050811]">
-        {/* Верхній тулбар */}
         <header className="h-14 border-b border-slate-900 px-6 flex items-center justify-between shrink-0 bg-[#070c18]/50">
           {activeTab === 'generator' ? (
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setGeneratorMode('builtin')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${generatorMode === 'builtin' ? 'bg-blue-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-slate-200'
-                  }`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                  generatorMode === 'builtin' ? 'bg-blue-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-slate-200'
+                }`}
               >
                 Регламентні рапорти ЗСУ
               </button>
               <button
-                onClick={() => setGeneratorMode('custom')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${generatorMode === 'custom' ? 'bg-blue-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-slate-200'
-                  }`}
+                onClick={() => {
+                  setGeneratorMode('custom');
+                  if (customTemplates.length > 0 && !selectedCustomId) {
+                    handleSelectTemplate(customTemplates[0]);
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                  generatorMode === 'custom'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-slate-900 text-slate-400 hover:text-slate-200'
+                }`}
               >
                 Власні .docx шаблони ({customTemplates.length})
               </button>
@@ -315,16 +445,17 @@ export default function App() {
             </div>
           )}
 
-          {/* Кнопки праворуч */}
           {activeTab === 'generator' && (
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setBuiltInFormData(testFormData)}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 hover:bg-slate-800 transition"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                🧪 ТЕСТ (САНДІЙ М.Т.)
-              </button>
+              {generatorMode === 'builtin' && (
+                <button
+                  onClick={() => setBuiltInFormData(testFormData)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 hover:bg-slate-800 transition"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  🧪 ТЕСТ (САНДІЙ М.Т.)
+                </button>
+              )}
 
               <button
                 onClick={handleExport}
@@ -343,13 +474,122 @@ export default function App() {
             <div className="grid grid-cols-12 h-full gap-6 p-6 overflow-hidden">
               {/* Ліва колонка: Форма введення */}
               <div className="col-span-6 h-full overflow-y-auto pr-2 custom-scrollbar">
-                <MilitaryReportForm
-                  formData={builtInFormData}
-                  setFormData={setBuiltInFormData}
-                />
+                {generatorMode === 'builtin' ? (
+                  <MilitaryReportForm
+                    formData={builtInFormData}
+                    setFormData={setBuiltInFormData}
+                  />
+                ) : (
+                  <div className="space-y-4">
+                    {/* Вибір завантаженого шаблону */}
+                    <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                          Обраний шаблон Word
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('templates')}
+                          className="text-xs text-blue-400 hover:underline flex items-center gap-1"
+                        >
+                          <Plus className="w-3 h-3" /> Додати шаблон
+                        </button>
+                      </div>
+
+                      <select
+                        value={selectedCustomId}
+                        onChange={(e) => {
+                          const tmpl = customTemplates.find(t => t.id === e.target.value);
+                          if (tmpl) handleSelectTemplate(tmpl);
+                        }}
+                        className="w-full h-8 rounded-md bg-slate-950 border border-slate-800 px-2.5 text-xs text-slate-100 focus:outline-none focus:border-blue-500"
+                      >
+                        {customTemplates.length > 0 ? (
+                          customTemplates.map(t => (
+                            <option key={t.id} value={t.id}>
+                              {t.title} ({t.category || 'Загальні'})
+                            </option>
+                          ))
+                        ) : (
+                          <option value="">Немає завантажених шаблонів</option>
+                        )}
+                      </select>
+                    </div>
+
+                    {/* Поля шаблону з інтерактивними Combobox */}
+                    {customTemplates.length > 0 && (
+                      <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 space-y-3">
+                        <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                            Поля шаблону ({customFields.length})
+                          </h3>
+                          {builtInFormData.pib && (
+                            <button
+                              type="button"
+                              onClick={handleAutoFillCustom}
+                              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-950 border border-blue-800 text-[11px] font-medium text-blue-300 hover:bg-blue-900 transition"
+                            >
+                              <UserCheck className="w-3.5 h-3.5 text-blue-400" />
+                              Заповнити з: {builtInFormData.pib.split(' ')[0]}
+                            </button>
+                          )}
+                        </div>
+
+                        {customFields.length > 0 ? (
+                          <div className="grid grid-cols-2 gap-3 pt-1">
+                            {customFields.map(f => {
+                              const currentValue = customValues[f.key] || '';
+                              const dropdownOptions = getDropdownOptionsForField(f.key);
+
+                              return (
+                                <div 
+                                  key={f.key} 
+                                  className={f.key.length > 20 ? 'col-span-2' : 'col-span-1'}
+                                >
+                                  <label className="block text-[11px] font-medium text-slate-400 mb-1 truncate" title={f.key}>
+                                    {f.label}{' '}
+                                    <span className="text-[10px] text-slate-600 font-mono">({`{{${f.key}}}`})</span>
+                                  </label>
+
+                                  {dropdownOptions ? (
+                                    <Combobox
+                                      value={currentValue}
+                                      onChange={val => setCustomValues(prev => ({ ...prev, [f.key]: val }))}
+                                      options={dropdownOptions}
+                                      placeholder={`Оберіть ${f.label.toLowerCase()}...`}
+                                    />
+                                  ) : f.type === 'date' ? (
+                                    <input
+                                      type="date"
+                                      value={currentValue}
+                                      onChange={e => setCustomValues(prev => ({ ...prev, [f.key]: e.target.value }))}
+                                      className="w-full h-8 rounded-md bg-slate-950 border border-slate-800 px-2.5 text-xs text-slate-100 focus:outline-none focus:border-blue-500"
+                                    />
+                                  ) : (
+                                    <input
+                                      type="text"
+                                      value={currentValue}
+                                      onChange={e => setCustomValues(prev => ({ ...prev, [f.key]: e.target.value }))}
+                                      placeholder={`Введіть ${f.label.toLowerCase()}...`}
+                                      className="w-full h-8 rounded-md bg-slate-950 border border-slate-800 px-2.5 text-xs text-slate-100 placeholder:text-slate-700 focus:outline-none focus:border-blue-500"
+                                    />
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="py-6 text-center text-xs text-slate-500">
+                            У цьому файлі не виявлено плейсхолдерів формату <code className="text-blue-400 font-mono">{"{{змінна}}"}</code>.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {/* Права колонка: Інтерактивне прев'ю без скролу */}
+              {/* Права колонка: Інтерактивне прев'ю DOCX */}
               <div className="col-span-6 h-full flex flex-col overflow-hidden">
                 <DocxViewer fileBuffer={previewBuffer} />
               </div>

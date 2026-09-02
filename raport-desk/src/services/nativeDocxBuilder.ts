@@ -5,7 +5,7 @@ import {
 import { MilitaryFormData } from '../components/MilitaryReportForm';
 import { 
   POSITIONS_MAP, formatPibCustom, inflectRank, inflectPosition, 
-  getExperienceAllowancePct, formatDaysUkr 
+  formatRecipientDative, getExperienceAllowancePct, formatDaysUkr 
 } from './militaryDict';
 
 function formatDateUkr(isoOrFormattedDate: string): string {
@@ -22,7 +22,7 @@ export function buildMilitaryReportDocx(data: MilitaryFormData): Document {
   const currentYear = new Date().getFullYear();
   const t = data.report_type;
 
-  // 1. ПІБ та відмінювання
+  // 1. ПІБ та відмінювання військовослужбовця
   const pNom = data.pib.trim().split(/\s+/).filter(Boolean);
   const pibUpper = pNom.length > 0
     ? pNom.map((w, i) => i === 0 ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
@@ -31,7 +31,7 @@ export function buildMilitaryReportDocx(data: MilitaryFormData): Document {
   const pibGen = pNom.length > 0 ? formatPibCustom(pibUpper, 'gent') : "";
   const pibDatv = pNom.length > 0 ? formatPibCustom(pibUpper, 'datv') : "";
 
-  // Підпис: Ім'я ПРІЗВИЩЕ
+  // Підпис: Ім'я ПРІЗВИЩЕ (наприклад: Максим САНДІЙ)
   const sigNom = pNom.length >= 2 
     ? `${pNom[1].charAt(0).toUpperCase() + pNom[1].slice(1).toLowerCase()} ${pNom[0].toUpperCase()}` 
     : (pNom[0] || "");
@@ -229,11 +229,13 @@ export function buildMilitaryReportDocx(data: MilitaryFormData): Document {
     docElements.push(addP("Командиру батареї", AlignmentType.RIGHT));
     docElements.push(addReportHeader());
 
-    const soldierDesc = [posGen, rankGen, pibGen].filter(Boolean).join(" ");
-    const intro = soldierDesc ? `, ${soldierDesc}` : "";
+    // Виправлення: після "надання мені" використовуємо давальний відмінок (Кому?)
+    // "номеру обслуги взводу... солдату САНДІЮ Максиму Тарасовичу"
+    const soldierDescDatv = [posDatv, rankDatv, pibDatv].filter(Boolean).join(" ");
+    const introDatv = soldierDescDatv ? `, ${soldierDescDatv}` : "";
 
     docElements.push(addP(
-      `Прошу Вашого клопотання перед вищим командуванням, про надання мені${intro}, направлення на військову-лікарську комісію до ${data.hospital}, згідно вимог «Положення про військово-лікарську експертизу в Збройних силах України», що затверджене Наказом Міністерства оборони України від 14 серпня 2008 року №402 з метою повторного встановлення придатності/непридатності до проходження військової служби.`.replace(/\s{2,}/g, ' '),
+      `Прошу Вашого клопотання перед вищим командуванням, про надання мені${introDatv}, направлення на військову-лікарську комісію до ${data.hospital}, згідно вимог «Положення про військово-лікарську експертизу в Збройних силах України», що затверджене Наказом Міністерства оборони України від 14 серпня 2008 року №402 з метою повторного встановлення придатності/непридатності до проходження військової служби.`.replace(/\s{2,}/g, ' '),
       AlignmentType.JUSTIFIED,
       true
     ));
@@ -279,12 +281,17 @@ export function buildMilitaryReportDocx(data: MilitaryFormData): Document {
   // --- 4. ПРИЙОМ ПОСАДИ (НОВИЙ ФОРМАТ) ---
   else if (t === "Прийом посади (новий формат)") {
     const expPct = getExperienceAllowancePct(data.exp_years);
-    const batRankD = data.bat_rank ? inflectRank(data.bat_rank, 'datv') : "";
-    const batNameD = data.bat_name ? formatPibCustom(data.bat_name, 'datv') : "";
+    
+    // Виправлення шапки адресата: "молодшому лейтенанту Роману ЗАЛУЦЬКОМУ"
+    const { prefixText: batPrefixD, recipientText: batRecipientD } = formatRecipientDative(
+      data.bat_pref || "Тимчасово виконуючий обов’язки командира",
+      data.bat_rank || "",
+      data.bat_name || ""
+    );
 
-    const headLines = ["Тимчасово виконуючому обов’язки командира батареї"];
-    if (batRankD || batNameD) {
-      headLines.push(`${batRankD} ${batNameD}`.trim());
+    const headLines = [`${batPrefixD} батареї`];
+    if (batRecipientD) {
+      headLines.push(batRecipientD);
     }
 
     docElements.push(new Paragraph({
@@ -299,12 +306,14 @@ export function buildMilitaryReportDocx(data: MilitaryFormData): Document {
     const tariffStr = data.tariff_range ? ` згідно тарифного розряду ${data.tariff_range}` : "";
     const staffStr = data.staff_category ? `, штатно-посадова категорія «${data.staff_category}»` : "";
     
-    // Форматування дати у вигляд ДД.ММ.РРРР
     const formattedAcceptanceDate = formatDateUkr(data.acceptance_date);
     const dateStr = formattedAcceptanceDate ? ` з ${formattedAcceptanceDate}` : "";
 
+    // Виправлення: посада у родовому відмінку ("номера обслуги взводу...")
+    const posGentText = posGen ? posGen.toLowerCase() : posNom.toLowerCase();
+
     docElements.push(addP(
-      `Дійсним доповідаю, що ${accordStr} я, ${personStr}, справи та посаду ${posNom.toLowerCase()} прийняв та приступив до виконання службових обов’язків за такою посадою з посадовим окладом${tariffStr}${staffStr}${dateStr}.`.replace(/\s{2,}/g, ' '),
+      `Дійсним доповідаю, що ${accordStr} я, ${personStr}, справи та посаду ${posGentText} прийняв та приступив до виконання службових обов’язків за такою посадою з посадовим окладом${tariffStr}${staffStr}${dateStr}.`.replace(/\s{2,}/g, ' '),
       AlignmentType.JUSTIFIED,
       true
     ));
@@ -337,13 +346,16 @@ export function buildMilitaryReportDocx(data: MilitaryFormData): Document {
     // Підпис військовослужбовця
     addAcceptanceSignatureBlock(posNom, rankNom, sigNom);
 
-    // Клопотання комбата
+    // Клопотання комбата до комдива
     const clopTarget = [rankGen, sigGen].filter(Boolean).join(" ");
-    const divRankD = data.div_rank ? inflectRank(data.div_rank, 'datv') : "";
-    const divNameD = data.div_name ? formatPibCustom(data.div_name, 'datv') : "";
+    const { prefixText: divPrefixD, recipientText: divRecipientD } = formatRecipientDative(
+      data.div_pref || "Тимчасово виконуючий обов’язки командира",
+      data.div_rank || "",
+      data.div_name || ""
+    );
 
-    const divHeadLines = ["Тимчасово виконуючому обов’язки командира", "дивізіону"];
-    if (divRankD || divNameD) divHeadLines.push(`${divRankD} ${divNameD}`.trim());
+    const divHeadLines = [`${divPrefixD} дивізіону`];
+    if (divRecipientD) divHeadLines.push(divRecipientD);
 
     docElements.push(addP());
     docElements.push(new Paragraph({
@@ -358,7 +370,7 @@ export function buildMilitaryReportDocx(data: MilitaryFormData): Document {
       formatCmdrName(data.bat_name)
     );
 
-    // Клопотання комдива
+    // Клопотання комдива до командира частини
     docElements.push(addP());
     docElements.push(new Paragraph({
       indent: { left: convertMillimetersToTwip(75) },
