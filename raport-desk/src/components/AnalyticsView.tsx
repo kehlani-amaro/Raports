@@ -4,7 +4,7 @@ import {
   Trash2, User, Search, CheckCircle2 
 } from 'lucide-react';
 import { 
-  getAnalyticsSummary, clearAllLogs, AnalyticsSummary, ReportLog 
+  getAnalyticsSummary, clearAllLogs, AnalyticsSummary 
 } from '../services/analyticsService';
 
 export const AnalyticsView: React.FC = () => {

@@ -31,7 +31,6 @@ export const DocxViewer: React.FC<DocxViewerProps> = ({ fileBuffer }) => {
       breakPages: true,
       useBase64URL: true,
       experimental: false,
-      trimXml: true
     })
       .then(() => {
         if (isMounted) setIsLoading(false);
