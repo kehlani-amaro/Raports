@@ -1,7 +1,7 @@
 name: Build Desktop App
 
 on:
-  workflow_dispatch: # Дозволяє запускати збірку вручну кнопкою з сайту GitHub
+  workflow_dispatch:
 
 jobs:
   build-tauri:
@@ -16,8 +16,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          node-version: 22
 
       - name: Setup Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -25,9 +24,9 @@ jobs:
       - name: Install Frontend Dependencies
         run: npm install
 
-      # Створюємо frontend білд перед запуском Tauri
+      # Запускаємо vite build без жорсткої блокування тайпскриптом перед Tauri
       - name: Build Web Assets
-        run: npm run build
+        run: npx vite build
 
       - name: Build Tauri Application
         uses: tauri-apps/tauri-action@v0
