@@ -137,7 +137,6 @@ export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {
 
     // 1. Нормалізація категорії/шаблону
     const rawCat = (l.template_title || l.category || 'Інше').trim();
-    const catKey = rawCat.toLowerCase();
     const catDisplay = rawCat.charAt(0).toUpperCase() + rawCat.slice(1);
     categoryMap[catDisplay] = (categoryMap[catDisplay] || 0) + 1;
 

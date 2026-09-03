@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Packer } from 'docx';
 import { MilitaryReportForm, MilitaryFormData } from './components/MilitaryReportForm';
 import { DocxViewer } from './components/DocxViewer';

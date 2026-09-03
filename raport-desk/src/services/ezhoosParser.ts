@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { MilitaryProfile, getAllProfiles, replaceAllProfiles, MilitaryStatus } from './profilesService';
+import { MilitaryProfile, getAllProfiles, replaceAllProfiles} from './profilesService';
 import { SALARY_TARIFF_MAP } from './militaryDict';
 
 function colLetterToIndex(col: string): number {
