@@ -1,0 +1,41 @@
+name: Build Desktop App
+
+on:
+  workflow_dispatch: # Дозволяє запускати збірку вручну кнопкою з сайту GitHub
+
+jobs:
+  build-tauri:
+    permissions:
+      contents: write
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Frontend Dependencies
+        run: npm install
+
+      # Створюємо frontend білд перед запуском Tauri
+      - name: Build Web Assets
+        run: npm run build
+
+      - name: Build Tauri Application
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v1.0.0
+          releaseName: 'RaportDesk v1.0.0'
+          releaseBody: 'Автономна збірка RaportDesk для Windows (x64)'
+          releaseDraft: false
+          prerelease: false
