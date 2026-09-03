@@ -135,15 +135,28 @@ export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {
     if (dStr === todayStr) todayCount++;
     if (d.getMonth() === curMonth && d.getFullYear() === curYear) monthCount++;
 
-    const cat = l.template_title || 'Інше';
-    categoryMap[cat] = (categoryMap[cat] || 0) + 1;
+    // 1. Нормалізація категорії/шаблону
+    const rawCat = (l.template_title || l.category || 'Інше').trim();
+    const catKey = rawCat.toLowerCase();
+    const catDisplay = rawCat.charAt(0).toUpperCase() + rawCat.slice(1);
+    categoryMap[catDisplay] = (categoryMap[catDisplay] || 0) + 1;
 
-    const rk = l.target_person_rank || 'Без звання';
-    rankMap[rk] = (rankMap[rk] || 0) + 1;
+    // 2. Нормалізація звання (приведення до одного регістру без пробілів)
+    const rawRank = (l.target_person_rank || '').trim();
+    const rankDisplay = rawRank 
+      ? rawRank.toLowerCase().charAt(0).toUpperCase() + rawRank.toLowerCase().slice(1)
+      : 'Без звання';
+
+    rankMap[rankDisplay] = (rankMap[rankDisplay] || 0) + 1;
   });
 
-  const byCategory = Object.entries(categoryMap).map(([name, value]) => ({ name, value }));
-  const byRank = Object.entries(rankMap).map(([rank, count]) => ({ rank, count })).sort((a, b) => b.count - a.count);
+  const byCategory = Object.entries(categoryMap)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value);
+
+  const byRank = Object.entries(rankMap)
+    .map(([rank, count]) => ({ rank, count }))
+    .sort((a, b) => b.count - a.count);
 
   return {
     totalCount: logs.length,
@@ -154,6 +167,7 @@ export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {
     recentLogs: logs.slice(0, 30)
   };
 }
+
 
 // Очищення журналу
 export async function clearAllLogs(): Promise<void> {

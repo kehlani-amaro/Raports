@@ -23,8 +23,9 @@ export const REPORT_TYPES = [
 
 export const RANKS = [
   "солдат", "старший солдат", "молодший сержант", "сержант", "старший сержант",
-  "головний сержант", "штаб-сержант", "майстер-сержант", "молодший лейтенант",
-  "лейтенант", "старший лейтенант", "капітан", "майор", "підполковник", "полковник"
+  "головний сержант", "штаб-сержант", "майстер-сержант", "старший майстер-сержант",
+  "головний майстер-сержант", "молодший лейтенант", "лейтенант", "старший лейтенант",
+  "капітан", "майор", "підполковник", "полковник"
 ];
 
 export const DIV_TYPES = [
@@ -73,86 +74,145 @@ export const SALARY_TARIFF_MAP: Record<string, string> = {
   "56": "9590", "57": "9730", "58": "9870", "59": "10010", "60": "10150"
 };
 
-// 3. Функції відмінювання українською мовою
+// 3. Відмінювання прізвищ
 export function inflectSurname(surname: string, targetCase: 'gent' | 'datv' = 'gent'): string {
   const s = surname.trim().toUpperCase();
   if (!s) return "";
 
-  if (s.endsWith('ІЙ')) return targetCase === 'gent' ? s.slice(0, -2) + 'ІЯ' : s.slice(0, -2) + 'ІЮ';
-  if (s.endsWith('ИЙ') || s.endsWith('ЬКИЙ') || s.endsWith('СЬКИЙ') || s.endsWith('ЦЬКИЙ')) {
+  // -ІЙ (САНДІЙ -> САНДІЯ / САНДІЮ)
+  if (s.endsWith('ІЙ')) {
+    return targetCase === 'gent' ? s.slice(0, -2) + 'ІЯ' : s.slice(0, -2) + 'ІЮ';
+  }
+  // -ИЙ, -СЬКИЙ, -ЦЬКИЙ, -ОЙ (ЗАЛУЦЬКИЙ -> ЗАЛУЦЬКОГО / ЗАЛУЦЬКОМУ)
+  if (s.endsWith('ИЙ') || s.endsWith('ЬКИЙ') || s.endsWith('СЬКИЙ') || s.endsWith('ЦЬКИЙ') || s.endsWith('ОЙ')) {
     return targetCase === 'gent' ? s.slice(0, -2) + 'ОГО' : s.slice(0, -2) + 'ОМУ';
   }
-  if (s.endsWith('ОК')) return targetCase === 'gent' ? s.slice(0, -2) + 'КА' : s.slice(0, -2) + 'КОВІ';
-  if (s.endsWith('ЕЦЬ')) return targetCase === 'gent' ? s.slice(0, -3) + 'ЦЯ' : s.slice(0, -3) + 'ЦЮ';
+  if (s.endsWith('ОК')) {
+    return targetCase === 'gent' ? s.slice(0, -2) + 'КА' : s.slice(0, -2) + 'КОВІ';
+  }
+  if (s.endsWith('ЕЦЬ')) {
+    return targetCase === 'gent' ? s.slice(0, -3) + 'ЦЯ' : s.slice(0, -3) + 'ЦЮ';
+  }
+  // -ЦЬО (МИХАНЦЬО -> МИХАНЦЯ / МИХАНЦЮ)
+  if (s.endsWith('ЦЬО')) {
+    return targetCase === 'gent' ? s.slice(0, -3) + 'ЦЯ' : s.slice(0, -3) + 'ЦЮ';
+  }
+  // -КО
+  if (s.endsWith('КО')) {
+    return targetCase === 'gent' ? s.slice(0, -1) + 'А' : s.slice(0, -1) + 'У';
+  }
   if (s.endsWith('О')) {
-    if (s.endsWith('ЦЬО')) return targetCase === 'gent' ? s.slice(0, -1) + 'Я' : s.slice(0, -1) + 'ЕВІ';
     return targetCase === 'gent' ? s.slice(0, -1) + 'А' : s.slice(0, -1) + 'ОВІ';
   }
-  if (s.endsWith('ОВ') || s.endsWith('ЄВ') || s.endsWith('ЕВ') || s.endsWith('ИН') || s.endsWith('ІН')) {
+  if (/(ОВ|ЄВ|ЕВ|ИН|ІН|ЇН)$/.test(s)) {
     return targetCase === 'gent' ? s + 'А' : s + 'У';
   }
-  if (s.endsWith('Ь')) return targetCase === 'gent' ? s.slice(0, -1) + 'Я' : s.slice(0, -1) + 'Ю';
+  if (s.endsWith('Ь')) {
+    return targetCase === 'gent' ? s.slice(0, -1) + 'Я' : s.slice(0, -1) + 'Ю';
+  }
 
   return targetCase === 'gent' ? s + 'А' : s + 'У';
 }
 
+function capitalize(str: string): string {
+  if (!str) return "";
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+}
+
+export function formatFirstName(name: string, targetCase: 'gent' | 'datv' = 'gent'): string {
+  const clean = name.trim();
+  if (!clean) return "";
+  const lower = clean.toLowerCase();
+
+  if (targetCase === 'gent') {
+    if (/[нрсдтвмбпфкгхжчшщ]$/.test(lower)) return capitalize(lower + 'а');
+    if (lower.endsWith('й')) return capitalize(lower.slice(0, -1) + 'я');
+    if (lower.endsWith('ь')) return capitalize(lower.slice(0, -1) + 'я');
+    if (lower.endsWith('о')) return capitalize(lower.slice(0, -1) + 'а');
+    if (lower.endsWith('а')) return capitalize(lower.slice(0, -1) + 'и');
+    if (lower.endsWith('я')) return capitalize(lower.slice(0, -1) + 'і');
+  } else {
+    // Давальний (Кому?)
+    if (lower.endsWith('й')) return capitalize(lower.slice(0, -1) + 'ю'); // Сергій -> Сергію
+    if (lower.endsWith('ь')) return capitalize(lower.slice(0, -1) + 'ю'); // Ігор -> Ігорю
+    if (lower.endsWith('о')) return capitalize(lower.slice(0, -1) + 'у'); // Петро -> Петру, Михайло -> Михайлу
+    if (lower.endsWith('а')) return capitalize(lower.slice(0, -1) + 'і'); // Микола -> Миколі
+    if (lower.endsWith('я')) return capitalize(lower.slice(0, -1) + 'і'); // Ілля -> Іллі
+    if (/[нрсдтвмбпфкгхжчшщ]$/.test(lower)) return capitalize(lower + 'у'); // Роман -> Роману, Максим -> Максиму
+  }
+
+  return capitalize(clean);
+}
+
+export function formatPatronymic(patronymic: string, targetCase: 'gent' | 'datv' = 'gent'): string {
+  const clean = patronymic.trim();
+  if (!clean) return "";
+  const lower = clean.toLowerCase();
+
+  if (targetCase === 'gent') {
+    if (lower.endsWith('ич')) return capitalize(lower + 'а');
+    if (lower.endsWith('на')) return capitalize(lower.slice(0, -1) + 'и');
+  } else {
+    if (lower.endsWith('ич')) return capitalize(lower + 'у');
+    if (lower.endsWith('на')) return capitalize(lower.slice(0, -1) + 'і');
+  }
+
+  return capitalize(clean);
+}
+
+// 4. Повний ПІБ військовослужбовця: "САНДІЙ Максим Тарасович"
 export function formatPibCustom(fullPib: string, targetCase: 'gent' | 'datv' = 'gent'): string {
   const parts = fullPib.trim().split(/\s+/);
   if (!parts[0]) return "";
 
   const sur = inflectSurname(parts[0], targetCase);
-  let fname = parts[1] ? parts[1].charAt(0).toUpperCase() + parts[1].slice(1).toLowerCase() : "";
-  
-  if (fname) {
-    if (targetCase === 'gent') {
-      if (/[нрсдтвмбпфкгх]$/i.test(fname)) fname += 'а';
-      else if (fname.endsWith('а')) fname = fname.slice(0, -1) + 'и';
-      else if (fname.endsWith('я')) fname = fname.slice(0, -1) + 'і';
-      else if (fname.endsWith('ій')) fname = fname.slice(0, -2) + 'ія';
-      else if (fname.endsWith('о')) fname = fname.slice(0, -1) + 'а';
-      else if (fname.endsWith('ь')) fname = fname.slice(0, -1) + 'я';
-    } else {
-      if (/[нрсдтвмбпфкгх]$/i.test(fname)) fname += 'у';
-      else if (fname.endsWith('а')) fname = fname.slice(0, -1) + 'і';
-      else if (fname.endsWith('ій')) fname = fname.slice(0, -2) + 'ію';
-      else if (fname.endsWith('о')) fname = fname.slice(0, -1) + 'ові';
-      else if (fname.endsWith('ь')) fname = fname.slice(0, -1) + 'ю';
-    }
-  }
+  const fname = parts[1] ? formatFirstName(parts[1], targetCase) : "";
+  const pname = parts[2] ? formatPatronymic(parts[2], targetCase) : "";
 
-  let pname = parts[2] ? parts[2].charAt(0).toUpperCase() + parts[2].slice(1).toLowerCase() : "";
-  if (pname) {
-    if (targetCase === 'gent') {
-      if (pname.endsWith('ич')) pname += 'а';
-      else if (pname.endsWith('вна')) pname = pname.slice(0, -1) + 'и';
-    } else {
-      if (pname.endsWith('ич')) pname += 'у';
-      else if (pname.endsWith('вна')) pname = pname.slice(0, -1) + 'і';
-    }
-  }
-
-  return `${sur} ${fname} ${pname}`.trim();
+  return [sur, fname, pname].filter(Boolean).join(" ");
 }
 
+// 5. Відмінювання військових звань
 export function inflectRank(rankStr: string, targetCase: 'gent' | 'datv' = 'gent'): string {
   const r = rankStr.trim().toLowerCase();
   const gentMap: Record<string, string> = {
-    "солдат": "солдата", "старший солдат": "старшого солдата",
-    "молодший сержант": "молодшого сержанта", "сержант": "сержанта",
-    "старший сержант": "старшого сержанта", "головний сержант": "головного сержанта",
-    "штаб-сержант": "штаб-сержанта", "майстер-сержант": "майстра-сержанта",
-    "молодший лейтенант": "молодшого лейтенанта", "лейтенант": "лейтенанта",
-    "старший лейтенант": "старшого лейтенанта", "капітан": "капітана",
-    "майор": "майора", "підполковник": "підполковника", "полковник": "полковника"
+    "солдат": "солдата",
+    "старший солдат": "старшого солдата",
+    "молодший сержант": "молодшого сержанта",
+    "сержант": "сержанта",
+    "старший сержант": "старшого сержанта",
+    "головний сержант": "головного сержанта",
+    "штаб-сержант": "штаб-сержанта",
+    "майстер-сержант": "майстра-сержанта",
+    "старший майстер-сержант": "старшого майстра-сержанта",
+    "головний майстер-сержант": "головного майстра-сержанта",
+    "молодший лейтенант": "молодшого лейтенанта",
+    "лейтенант": "лейтенанта",
+    "старший лейтенант": "старшого лейтенанта",
+    "капітан": "капітана",
+    "майор": "майора",
+    "підполковник": "підполковника",
+    "полковник": "полковника"
   };
+
   const datvMap: Record<string, string> = {
-    "солдат": "солдату", "старший солдат": "старшому солдату",
-    "молодший сержант": "молодшому сержанту", "сержант": "сержанту",
-    "старший сержант": "старшому сержанту", "головний сержант": "головному сержанту",
-    "штаб-сержант": "штаб-сержанту", "майстер-сержант": "майстру-сержанту",
-    "молодший лейтенант": "молодшому лейтенанту", "лейтенант": "лейтенанту",
-    "старший лейтенант": "старшому лейтенанту", "капітан": "капітану",
-    "майор": "майору", "підполковник": "підполковнику", "полковник": "полковнику"
+    "солдат": "солдату",
+    "старший солдат": "старшому солдату",
+    "молодший сержант": "молодшому сержанту",
+    "сержант": "сержанту",
+    "старший сержант": "старшому сержанту",
+    "головний сержант": "головному сержанту",
+    "штаб-сержант": "штаб-сержанту",
+    "майстер-сержант": "майстру-сержанту",
+    "старший майстер-сержант": "старшому майстру-сержанту",
+    "головний майстер-сержант": "головному майстру-сержанту",
+    "молодший лейтенант": "молодшому лейтенанту",
+    "лейтенант": "лейтенанту",
+    "старший лейтенант": "старшому лейтенанту",
+    "капітан": "капітану",
+    "майор": "майору",
+    "підполковник": "підполковнику",
+    "полковник": "полковнику"
   };
 
   if (targetCase === 'gent') return gentMap[r] || r;
@@ -160,12 +220,16 @@ export function inflectRank(rankStr: string, targetCase: 'gent' | 'datv' = 'gent
   return r;
 }
 
-export function inflectPosition(posStr: string, targetCase: 'gent' | 'datv' = 'gent'): string {
-  const words = posStr.trim().split(/\s+/);
-  if (!words[0]) return "";
+// 6. Відмінювання посад (Родовий gent, Давальний datv, Орудний inst)
+export function inflectPosition(posStr: string, targetCase: 'gent' | 'datv' | 'inst' = 'gent'): string {
+  const clean = posStr.trim();
+  if (!clean) return "";
+
+  const words = clean.split(/\s+/);
   let fWord = words[0].toLowerCase();
 
   if (targetCase === 'gent') {
+    // Кого / Чого? ("справи та посаду номера обслуги")
     if (fWord === "номер") fWord = "номера";
     else if (fWord === "командир") fWord = "командира";
     else if (fWord === "водій") fWord = "водія";
@@ -174,7 +238,10 @@ export function inflectPosition(posStr: string, targetCase: 'gent' | 'datv' = 'g
     else if (fWord === "курсант") fWord = "курсанта";
     else if (fWord === "прикомандирований") fWord = "прикомандированого";
     else if (fWord === "водій-номер") fWord = "водія-номера";
-  } else {
+    else if (fWord === "стрілець") fWord = "стрільця";
+    else if (fWord === "старший") fWord = "старшого";
+  } else if (targetCase === 'datv') {
+    // Кому / Чому? ("надання мені, номеру обслуги...")
     if (fWord === "номер") fWord = "номеру";
     else if (fWord === "командир") fWord = "командиру";
     else if (fWord === "водій") fWord = "водію";
@@ -183,12 +250,66 @@ export function inflectPosition(posStr: string, targetCase: 'gent' | 'datv' = 'g
     else if (fWord === "курсант") fWord = "курсанту";
     else if (fWord === "прикомандирований") fWord = "прикомандированому";
     else if (fWord === "водій-номер") fWord = "водію-номеру";
+    else if (fWord === "стрілець") fWord = "стрільцю";
+    else if (fWord === "старший") fWord = "старшому";
+  } else if (targetCase === 'inst') {
+    if (fWord === "номер") fWord = "номером";
+    else if (fWord === "командир") fWord = "командиром";
+    else if (fWord === "водій") fWord = "водієм";
+    else if (fWord === "навідник") fWord = "навідником";
+    else if (fWord === "інструктор") fWord = "інструктором";
+    else if (fWord === "курсант") fWord = "курсантом";
+    else if (fWord === "прикомандирований") fWord = "прикомандированим";
+    else if (fWord === "водій-номер") fWord = "водієм-номером";
+    else if (fWord === "стрілець") fWord = "стрільцем";
+    else if (fWord === "старший") fWord = "старшим";
   }
 
   const rest = words.slice(1).join(" ");
   return rest ? `${fWord} ${rest}` : fWord;
 }
 
+// 7. Форматування адресата "Кому"
+// Результат: "молодшому лейтенанту Роману ЗАЛУЦЬКОМУ"
+export function formatRecipientDative(prefix: string, rank: string, rawFullName: string): { prefixText: string; recipientText: string } {
+  const parts = rawFullName.trim().split(/\s+/);
+  let firstName = "";
+  let lastName = "";
+
+  if (parts.length === 1) {
+    lastName = parts[0];
+  } else if (parts.length >= 2) {
+    // Якщо ввели: "ЗАЛУЦЬКИЙ Роман"
+    if (parts[0] === parts[0].toUpperCase() && parts[1] !== parts[1].toUpperCase()) {
+      lastName = parts[0];
+      firstName = parts[1];
+    } else {
+      // "Роман ЗАЛУЦЬКИЙ" або "Роман Залуцький"
+      firstName = parts[0];
+      lastName = parts.slice(1).join(" ");
+    }
+  }
+
+  const dativeRank = inflectRank(rank, 'datv');
+  const dativeFirstName = firstName ? formatFirstName(firstName, 'datv') : "";
+  const dativeLastName = lastName ? inflectSurname(lastName, 'datv').toUpperCase() : "";
+
+  let dativePrefix = prefix.trim();
+  if (/^тимчасово\s+виконуючий/i.test(dativePrefix)) {
+    dativePrefix = "Тимчасово виконуючому обов’язки командира";
+  } else if (/^командир/i.test(dativePrefix)) {
+    dativePrefix = "Командиру";
+  }
+
+  const recipientLine = [dativeRank, dativeFirstName, dativeLastName].filter(Boolean).join(" ");
+
+  return {
+    prefixText: dativePrefix,
+    recipientText: recipientLine
+  };
+}
+
+// 8. Вислуга років
 export function getExperienceAllowancePct(years: number): number {
   if (years < 1) return 0;
   if (years >= 1 && years < 5) return 25;
@@ -199,6 +320,7 @@ export function getExperienceAllowancePct(years: number): number {
   return 50;
 }
 
+// 9. Форматування днів
 export function formatDaysUkr(days: number): string {
   const numWords: Record<number, string> = {
     1: "один", 2: "два", 3: "три", 4: "чотири", 5: "п’ять",
